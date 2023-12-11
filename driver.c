@@ -1,7 +1,7 @@
 #include <ntddk.h>
 
 
-#define DEVICE_NAME L"\\Device\\TestReadDriver"
+#define DEVICE_NAME L"\\Device\\DriverTest"
 #define SYM_LINK_NAME L"\\??\\TestRead"
 
 
