@@ -3,7 +3,87 @@
 
 #define DEVICE_NAME L"\\Device\\DriverTest"
 #define SYM_LINK_NAME L"\\??\\DriverControlsTest"
+
 #define IOCTL_TEST CTL_CODE(FILE_DEVICE_UNKNOWN, 0x800, METHOD_BUFFERED, FILE_ANY_ACCESS)
+#define ENUMERATE_MODULES CTL_CODE(FILE_DEVICE_UNKNOWN, 0x810, METHOD_BUFFERED, FILE_ANY_ACCESS)
+
+#define SystemModuleInformation 0x0B
+
+
+typedef unsigned char       BYTE;
+typedef VOID (NTAPI* PPS_POST_PROCESS_INIT_ROUTINE) (VOID);
+
+typedef struct _MODULE_INFO {
+	LIST_ENTRY InLoadOrderModuleList;
+	LIST_ENTRY InMemoryOrderModuleList;
+	LIST_ENTRY InInitializationOrderModuleList;
+	PVOID BaseAddress;
+	PVOID EntryPoint;
+	ULONG SizeOfImage;
+	UNICODE_STRING FullPathName;
+	UNICODE_STRING ModuleName;
+} MODULE_INFO, * PMODULE_INFO;
+
+typedef struct _RTL_USER_PROCESS_PARAMETERS {
+	BYTE Reserved1[16];
+	PVOID Reserved2[10];
+	UNICODE_STRING ImagePathName;
+	UNICODE_STRING CommandLine;
+} RTL_USER_PROCESS_PARAMETERS, * PRTL_USER_PROCESS_PARAMETERS;
+
+typedef struct _PEB_LDR_DATA
+{
+	ULONG Length;
+	BOOLEAN Initialized;
+	HANDLE SsHandle;
+	LIST_ENTRY InLoadOrderModuleList;
+	LIST_ENTRY InMemoryOrderModuleList;
+	LIST_ENTRY InInitializationOrderModuleList;
+	PVOID EntryInProgress;
+	BOOLEAN ShutdownInProgress;
+	HANDLE ShutdownThreadId;
+} PEB_LDR_DATA, * PPEB_LDR_DATA;
+
+
+typedef struct _PEB
+{
+	UCHAR InheritedAddressSpace;
+	UCHAR ReadImageFileExecOptions;
+	UCHAR BeingDebugged;
+	union {
+		UCHAR BitField[5];
+	};
+	PVOID Mutant;
+	PVOID ImageBaseAddress;
+	PPEB_LDR_DATA Ldr;
+	PVOID ProcessParameters;
+	ULONG64 SubSystemData;
+} PEB, * PPEB;
+
+
+
+//typedef struct _PEB {
+//	BOOLEAN InheritedAddressSpace;
+//	BOOLEAN ReadImageFileExecOptions;
+//	BOOLEAN BeingDebugged;
+//	union {
+//		BOOLEAN BitField;
+//		struct {
+//			BOOLEAN ImageUsesLargePages : 1;
+//			BOOLEAN IsProtectedProcess : 1;
+//			BOOLEAN IsImageDynamicallyRelocated : 1;
+//			BOOLEAN SkipPatchingUser32Forwarders : 1;
+//			BOOLEAN IsPackagedProcess : 1;
+//			BOOLEAN IsAppContainer : 1;
+//			BOOLEAN IsProtectedProcessLight : 1;
+//			BOOLEAN IsLongPathAwareProcess : 1;
+//		};
+//	};
+//	HANDLE Mutant;
+//	PVOID ImageBaseAddress;
+//	PPEB_LDR_DATA Ldr;
+//	// ...
+//} PEB, * PPEB;
 
 
 NTSTATUS DriverUnload(PDRIVER_OBJECT pDriverObject);
@@ -12,6 +92,7 @@ NTSTATUS DriverControl(PDEVICE_OBJECT pDriverObject, PIRP pIrp);
 NTSTATUS DriverRead(PDEVICE_OBJECT pDriverObject, PIRP pIrp);
 NTSTATUS DriverWrite(PDEVICE_OBJECT pDriverObject, PIRP pIrp);
 NTSTATUS KillProcess(ULONG pid);
+NTSTATUS EnumerateModules();
 
 NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegPath)
 {
@@ -99,6 +180,16 @@ NTSTATUS DriverControl(PDEVICE_OBJECT pDriverObject, PIRP pIrp)
 
 		break;
 	}
+	case ENUMERATE_MODULES:
+		DbgPrint("[DriverTest] DriverControl ENUMERATE_MODULES");
+
+		EnumerateModules();
+
+		PVOID pBuff = pIrp->AssociatedIrp.SystemBuffer;
+		memset(pBuff, status, 10);
+		info = 10;
+
+		break;
 	default:
 		break;
 	}
@@ -148,6 +239,7 @@ NTSTATUS DriverWrite(PDEVICE_OBJECT pDriverObject, PIRP pIrp)
 	return status;
 }
 
+// 杀进程
 NTSTATUS KillProcess(ULONG pid)
 {
 	NTSTATUS status = STATUS_SUCCESS;
@@ -166,5 +258,61 @@ NTSTATUS KillProcess(ULONG pid)
 	}
 
 	DbgPrint("[DriverTest] KillProcess PID: %d", pid);
+	return status;
+}
+
+// 获取 PEB 结构的地址
+PPEB GetPebAddress()
+{
+	PPEB peb = NULL;
+#ifdef _WIN64
+	peb = (PPEB)__readgsqword(0x60);
+#else
+	peb = (PPEB)__readfsdword(0x30);
+#endif
+	return peb;
+}
+
+// 模块地址
+NTSTATUS EnumerateModules()
+{
+	NTSTATUS status = STATUS_SUCCESS;
+
+	PPEB peb = GetPebAddress();
+	if (peb == NULL)
+	{
+		KdPrint(("peb is null..."));
+		return status;
+	}
+	KdPrint(("peb %p\n", peb));
+
+	PPEB_LDR_DATA ldr = peb->Ldr;
+	if (ldr == NULL)
+	{
+		KdPrint(("ldr is null..."));
+		return status;
+	}
+	KdPrint(("ldr %p\n", ldr));
+	return status;
+
+	PLIST_ENTRY moduleList = &(ldr->InLoadOrderModuleList);
+	PLIST_ENTRY moduleEntry = moduleList->Flink;
+
+	KdPrint(("moduleList %p\n", moduleList));
+	KdPrint(("moduleEntry %p\n", moduleEntry));
+
+	while (moduleEntry != moduleList)
+	{
+		PMODULE_INFO moduleInfo = CONTAINING_RECORD(moduleEntry, MODULE_INFO, InLoadOrderModuleList);
+
+		KdPrint(("Module BaseAddress: %p\n", moduleInfo->BaseAddress));
+		KdPrint(("Module Size: %lu\n", moduleInfo->SizeOfImage));
+		KdPrint(("Module FullPath: %wZ\n", moduleInfo->FullPathName));
+		KdPrint(("Module Name: %wZ\n", moduleInfo->ModuleName));
+
+		moduleEntry = moduleEntry->Flink;
+	}
+
+	KdPrint(("[DriverTest] EnumerateModules"));
 	return status;
 }
