@@ -4,6 +4,7 @@
     <SignMode>Off</SignMode>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <SignMode>Off</SignMode>
+    <SignMode>TestSign</SignMode>
+    <TestCertificate>CN="WDKTestCert ab,133467811850784616" | 9632A4638ACD009C44886EDBE5485D2448BAD011</TestCertificate>
   </PropertyGroup>
 </Project>

@@ -9,82 +9,123 @@
 
 #define SystemModuleInformation 0x0B
 
-
 typedef unsigned char       BYTE;
-typedef VOID (NTAPI* PPS_POST_PROCESS_INIT_ROUTINE) (VOID);
+typedef VOID(NTAPI* PPS_POST_PROCESS_INIT_ROUTINE) (VOID);
 
-typedef struct _MODULE_INFO {
-	LIST_ENTRY InLoadOrderModuleList;
-	LIST_ENTRY InMemoryOrderModuleList;
-	LIST_ENTRY InInitializationOrderModuleList;
-	PVOID BaseAddress;
-	PVOID EntryPoint;
-	ULONG SizeOfImage;
-	UNICODE_STRING FullPathName;
-	UNICODE_STRING ModuleName;
-} MODULE_INFO, * PMODULE_INFO;
+// system module
+typedef struct _SYSTEM_MODULE {
+	ULONG                Reserved1;
+	ULONG                Reserved2;
+	PVOID                ImageBaseAddress;
+	ULONG                ImageSize;
+	ULONG                Flags;
+	INT64                Id;
+	INT64                Rank;
+	INT64                w018;
+	INT64                NameOffset;
+	BYTE                 Name[MAXIMUM_FILENAME_LENGTH];
+} SYSTEM_MODULE, * PSYSTEM_MODULE;
 
-typedef struct _RTL_USER_PROCESS_PARAMETERS {
-	BYTE Reserved1[16];
-	PVOID Reserved2[10];
-	UNICODE_STRING ImagePathName;
-	UNICODE_STRING CommandLine;
-} RTL_USER_PROCESS_PARAMETERS, * PRTL_USER_PROCESS_PARAMETERS;
+// system module information
+typedef struct _SYSTEM_MODULE_INFORMATION {
+	ULONG                ModulesCount;
+	SYSTEM_MODULE        Modules[0];
+} SYSTEM_MODULE_INFORMATION, * PSYSTEM_MODULE_INFORMATION;
 
-typedef struct _PEB_LDR_DATA
-{
-	ULONG Length;
-	BOOLEAN Initialized;
-	HANDLE SsHandle;
-	LIST_ENTRY InLoadOrderModuleList;
-	LIST_ENTRY InMemoryOrderModuleList;
-	LIST_ENTRY InInitializationOrderModuleList;
-	PVOID EntryInProgress;
-	BOOLEAN ShutdownInProgress;
-	HANDLE ShutdownThreadId;
+// LDR_MODULE
+typedef struct _LDR_MODULE {
+	LIST_ENTRY              InLoadOrderModuleList;
+	LIST_ENTRY              InMemoryOrderModuleList;
+	LIST_ENTRY              InInitializationOrderModuleList;
+	PVOID                   BaseAddress;
+	PVOID                   EntryPoint;
+	ULONG                   SizeOfImage;
+	UNICODE_STRING          FullDllName;
+	UNICODE_STRING          BaseDllName;
+	ULONG                   Flags;
+	SHORT                   LoadCount;
+	SHORT                   TlsIndex;
+	LIST_ENTRY              HashTableEntry;
+	ULONG                   TimeDateStamp;
+} LDR_MODULE, * PLDR_MODULE;
+
+// PEB_LDR_DATA 
+typedef struct _PEB_LDR_DATA {
+	ULONG                   Length;
+	BOOLEAN                 Initialized;
+	PVOID                   SsHandle;
+	LIST_ENTRY              InLoadOrderModuleList;
+	LIST_ENTRY              InMemoryOrderModuleList;
+	LIST_ENTRY              InInitializationOrderModuleList;
 } PEB_LDR_DATA, * PPEB_LDR_DATA;
 
-
-typedef struct _PEB
-{
-	UCHAR InheritedAddressSpace;
-	UCHAR ReadImageFileExecOptions;
-	UCHAR BeingDebugged;
-	union {
-		UCHAR BitField[5];
-	};
-	PVOID Mutant;
-	PVOID ImageBaseAddress;
-	PPEB_LDR_DATA Ldr;
-	PVOID ProcessParameters;
-	ULONG64 SubSystemData;
+// PEB
+typedef struct _PEB {
+	BOOLEAN                 InheritedAddressSpace;
+	BOOLEAN                 ReadImageFileExecOptions;
+	BOOLEAN                 BeingDebugged;
+	BOOLEAN                 Spare;
+	HANDLE                  Mutant;
+	PVOID                   ImageBaseAddress;
+	PPEB_LDR_DATA           LoaderData;
+	PVOID					ProcessParameters;
+	PVOID                   SubSystemData;
+	PVOID                   ProcessHeap;
+	PVOID                   FastPebLock;
+	PVOID					FastPebLockRoutine;
+	PVOID					FastPebUnlockRoutine;
+	ULONG                   EnvironmentUpdateCount;
+	PVOID                  KernelCallbackTable;
+	PVOID                   EventLogSection;
+	PVOID                   EventLog;
+	PVOID					FreeList;
+	ULONG                   TlsExpansionCounter;
+	PVOID                   TlsBitmap;
+	ULONG                   TlsBitmapBits[0x2];
+	PVOID                   ReadOnlySharedMemoryBase;
+	PVOID                   ReadOnlySharedMemoryHeap;
+	PVOID                   ReadOnlyStaticServerData;
+	PVOID                   AnsiCodePageData;
+	PVOID                   OemCodePageData;
+	PVOID                   UnicodeCaseTableData;
+	ULONG                   NumberOfProcessors;
+	ULONG                   NtGlobalFlag;
+	BYTE                    Spare2[0x4];
+	LARGE_INTEGER           CriticalSectionTimeout;
+	ULONG                   HeapSegmentReserve;
+	ULONG                   HeapSegmentCommit;
+	ULONG                   HeapDeCommitTotalFreeThreshold;
+	ULONG                   HeapDeCommitFreeBlockThreshold;
+	ULONG                   NumberOfHeaps;
+	ULONG                   MaximumNumberOfHeaps;
+	PVOID*					ProcessHeaps;
+	PVOID                   GdiSharedHandleTable;
+	PVOID                   ProcessStarterHelper;
+	PVOID                   GdiDCAttributeList;
+	PVOID                   LoaderLock;
+	ULONG                   OSMajorVersion;
+	ULONG                   OSMinorVersion;
+	ULONG                   OSBuildNumber;
+	ULONG                   OSPlatformId;
+	ULONG                   ImageSubSystem;
+	ULONG                   ImageSubSystemMajorVersion;
+	ULONG                   ImageSubSystemMinorVersion;
+	ULONG                   GdiHandleBuffer[0x22];
+	ULONG                   PostProcessInitRoutine;
+	ULONG                   TlsExpansionBitmap;
+	BYTE                    TlsExpansionBitmapBits[0x80];
+	ULONG                   SessionId;
 } PEB, * PPEB;
 
 
-
-//typedef struct _PEB {
-//	BOOLEAN InheritedAddressSpace;
-//	BOOLEAN ReadImageFileExecOptions;
-//	BOOLEAN BeingDebugged;
-//	union {
-//		BOOLEAN BitField;
-//		struct {
-//			BOOLEAN ImageUsesLargePages : 1;
-//			BOOLEAN IsProtectedProcess : 1;
-//			BOOLEAN IsImageDynamicallyRelocated : 1;
-//			BOOLEAN SkipPatchingUser32Forwarders : 1;
-//			BOOLEAN IsPackagedProcess : 1;
-//			BOOLEAN IsAppContainer : 1;
-//			BOOLEAN IsProtectedProcessLight : 1;
-//			BOOLEAN IsLongPathAwareProcess : 1;
-//		};
-//	};
-//	HANDLE Mutant;
-//	PVOID ImageBaseAddress;
-//	PPEB_LDR_DATA Ldr;
-//	// ...
-//} PEB, * PPEB;
-
+NTSYSAPI
+NTSTATUS
+NTAPI ZwQuerySystemInformation(
+	IN ULONG SystemInformationClass,
+	OUT PVOID SystemInformation,
+	IN ULONG SystemInformationLength,
+	OUT PULONG ReturnLength OPTIONAL
+);
 
 NTSTATUS DriverUnload(PDRIVER_OBJECT pDriverObject);
 NTSTATUS MajorHandle(PDEVICE_OBJECT pDriverObject, PIRP pIrp);
@@ -93,6 +134,7 @@ NTSTATUS DriverRead(PDEVICE_OBJECT pDriverObject, PIRP pIrp);
 NTSTATUS DriverWrite(PDEVICE_OBJECT pDriverObject, PIRP pIrp);
 NTSTATUS KillProcess(ULONG pid);
 NTSTATUS EnumerateModules();
+NTSTATUS EnumerateModulesEx();
 
 NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegPath)
 {
@@ -183,7 +225,7 @@ NTSTATUS DriverControl(PDEVICE_OBJECT pDriverObject, PIRP pIrp)
 	case ENUMERATE_MODULES:
 		DbgPrint("[DriverTest] DriverControl ENUMERATE_MODULES");
 
-		EnumerateModules();
+		EnumerateModulesEx();
 
 		PVOID pBuff = pIrp->AssociatedIrp.SystemBuffer;
 		memset(pBuff, status, 10);
@@ -261,7 +303,7 @@ NTSTATUS KillProcess(ULONG pid)
 	return status;
 }
 
-// 获取 PEB 结构的地址
+// 获取PEB
 PPEB GetPebAddress()
 {
 	PPEB peb = NULL;
@@ -278,41 +320,71 @@ NTSTATUS EnumerateModules()
 {
 	NTSTATUS status = STATUS_SUCCESS;
 
-	PPEB peb = GetPebAddress();
-	if (peb == NULL)
+	PPEB pPeb = GetPebAddress();
+	if (!pPeb)
 	{
-		KdPrint(("peb is null..."));
+		KdPrint(("[DriverTest] PPEB is null..."));
 		return status;
 	}
-	KdPrint(("peb %p\n", peb));
-
-	PPEB_LDR_DATA ldr = peb->Ldr;
-	if (ldr == NULL)
+	// TODO: Existing problem
+	PPEB_LDR_DATA pLdr = pPeb->LoaderData;
+	if (!pLdr)
 	{
-		KdPrint(("ldr is null..."));
+		KdPrint(("[DriverTest] PPEB_LDR_DATA is null..."));
 		return status;
 	}
-	KdPrint(("ldr %p\n", ldr));
-	return status;
 
-	PLIST_ENTRY moduleList = &(ldr->InLoadOrderModuleList);
+	PLIST_ENTRY moduleList = &(pLdr->InLoadOrderModuleList);
 	PLIST_ENTRY moduleEntry = moduleList->Flink;
-
-	KdPrint(("moduleList %p\n", moduleList));
-	KdPrint(("moduleEntry %p\n", moduleEntry));
 
 	while (moduleEntry != moduleList)
 	{
-		PMODULE_INFO moduleInfo = CONTAINING_RECORD(moduleEntry, MODULE_INFO, InLoadOrderModuleList);
+		PLDR_MODULE module = CONTAINING_RECORD(moduleEntry, LDR_MODULE, InLoadOrderModuleList);
 
-		KdPrint(("Module BaseAddress: %p\n", moduleInfo->BaseAddress));
-		KdPrint(("Module Size: %lu\n", moduleInfo->SizeOfImage));
-		KdPrint(("Module FullPath: %wZ\n", moduleInfo->FullPathName));
-		KdPrint(("Module Name: %wZ\n", moduleInfo->ModuleName));
+		KdPrint(("[DriverTest] Module FullPath:%wZ\tBaseAddress:0x%p",
+			module->FullDllName, module->BaseAddress));
 
 		moduleEntry = moduleEntry->Flink;
 	}
 
 	KdPrint(("[DriverTest] EnumerateModules"));
+	return status;
+}
+
+// 模块地址
+NTSTATUS EnumerateModulesEx()
+{
+	NTSTATUS status = STATUS_SUCCESS;
+
+	ULONG length = 0;
+	status = ZwQuerySystemInformation(SystemModuleInformation, NULL, NULL, &length);
+	if (status == STATUS_INFO_LENGTH_MISMATCH)
+	{
+		PVOID p = ExAllocatePool2(POOL_FLAG_NON_PAGED, length, 'ISQZ');
+		if (!p) {
+			KdPrint(("[DriverTest] EnumerateModulesEx ExAllocatePool Fail [size:%d], There is not enough memory in the pool to satisfy the request...\n", length));
+			return status;
+		}
+
+		status = ZwQuerySystemInformation(SystemModuleInformation, p, length, &length);
+		if (!NT_SUCCESS(status))
+		{
+			KdPrint(("[DriverTest] EnumerateModulesEx ZwQuerySystemInformation [2] Fail %d ...\n", status));
+			return status;
+		}
+
+		PSYSTEM_MODULE_INFORMATION pSystemModelInformation = (PSYSTEM_MODULE_INFORMATION)p;
+		for (ULONG i = 0; i < pSystemModelInformation->ModulesCount; i++)
+		{
+			KdPrint(("[DriverTest] EnumerateModulesEx SystemModelInformation: Name:%-50s Base:0x%p\n",
+				pSystemModelInformation->Modules[i].Name, pSystemModelInformation->Modules[i].ImageBaseAddress));
+		}
+
+		ExFreePool(p, 'ISQZ');
+	}
+	else {
+		KdPrint(("[DriverTest] EnumerateModulesEx ZwQuerySystemInformation [1] Fail %d ...\n", status));
+	}
+
 	return status;
 }
