@@ -1,140 +1,4 @@
-#include <ntddk.h>
-
-
-#define DEVICE_NAME L"\\Device\\DriverTest"
-#define SYM_LINK_NAME L"\\??\\DriverControlsTest"
-
-#define IOCTL_TEST CTL_CODE(FILE_DEVICE_UNKNOWN, 0x800, METHOD_BUFFERED, FILE_ANY_ACCESS)
-#define ENUMERATE_MODULES CTL_CODE(FILE_DEVICE_UNKNOWN, 0x810, METHOD_BUFFERED, FILE_ANY_ACCESS)
-
-#define SystemModuleInformation 0x0B
-
-typedef unsigned char       BYTE;
-typedef VOID(NTAPI* PPS_POST_PROCESS_INIT_ROUTINE) (VOID);
-
-// system module
-typedef struct _SYSTEM_MODULE {
-	ULONG                Reserved1;
-	ULONG                Reserved2;
-	PVOID                ImageBaseAddress;
-	ULONG                ImageSize;
-	ULONG                Flags;
-	INT64                Id;
-	INT64                Rank;
-	INT64                w018;
-	INT64                NameOffset;
-	BYTE                 Name[MAXIMUM_FILENAME_LENGTH];
-} SYSTEM_MODULE, * PSYSTEM_MODULE;
-
-// system module information
-typedef struct _SYSTEM_MODULE_INFORMATION {
-	ULONG                ModulesCount;
-	SYSTEM_MODULE        Modules[0];
-} SYSTEM_MODULE_INFORMATION, * PSYSTEM_MODULE_INFORMATION;
-
-// LDR_MODULE
-typedef struct _LDR_MODULE {
-	LIST_ENTRY              InLoadOrderModuleList;
-	LIST_ENTRY              InMemoryOrderModuleList;
-	LIST_ENTRY              InInitializationOrderModuleList;
-	PVOID                   BaseAddress;
-	PVOID                   EntryPoint;
-	ULONG                   SizeOfImage;
-	UNICODE_STRING          FullDllName;
-	UNICODE_STRING          BaseDllName;
-	ULONG                   Flags;
-	SHORT                   LoadCount;
-	SHORT                   TlsIndex;
-	LIST_ENTRY              HashTableEntry;
-	ULONG                   TimeDateStamp;
-} LDR_MODULE, * PLDR_MODULE;
-
-// PEB_LDR_DATA 
-typedef struct _PEB_LDR_DATA {
-	ULONG                   Length;
-	BOOLEAN                 Initialized;
-	PVOID                   SsHandle;
-	LIST_ENTRY              InLoadOrderModuleList;
-	LIST_ENTRY              InMemoryOrderModuleList;
-	LIST_ENTRY              InInitializationOrderModuleList;
-} PEB_LDR_DATA, * PPEB_LDR_DATA;
-
-// PEB
-typedef struct _PEB {
-	BOOLEAN                 InheritedAddressSpace;
-	BOOLEAN                 ReadImageFileExecOptions;
-	BOOLEAN                 BeingDebugged;
-	BOOLEAN                 Spare;
-	HANDLE                  Mutant;
-	PVOID                   ImageBaseAddress;
-	PPEB_LDR_DATA           LoaderData;
-	PVOID					ProcessParameters;
-	PVOID                   SubSystemData;
-	PVOID                   ProcessHeap;
-	PVOID                   FastPebLock;
-	PVOID					FastPebLockRoutine;
-	PVOID					FastPebUnlockRoutine;
-	ULONG                   EnvironmentUpdateCount;
-	PVOID                  KernelCallbackTable;
-	PVOID                   EventLogSection;
-	PVOID                   EventLog;
-	PVOID					FreeList;
-	ULONG                   TlsExpansionCounter;
-	PVOID                   TlsBitmap;
-	ULONG                   TlsBitmapBits[0x2];
-	PVOID                   ReadOnlySharedMemoryBase;
-	PVOID                   ReadOnlySharedMemoryHeap;
-	PVOID                   ReadOnlyStaticServerData;
-	PVOID                   AnsiCodePageData;
-	PVOID                   OemCodePageData;
-	PVOID                   UnicodeCaseTableData;
-	ULONG                   NumberOfProcessors;
-	ULONG                   NtGlobalFlag;
-	BYTE                    Spare2[0x4];
-	LARGE_INTEGER           CriticalSectionTimeout;
-	ULONG                   HeapSegmentReserve;
-	ULONG                   HeapSegmentCommit;
-	ULONG                   HeapDeCommitTotalFreeThreshold;
-	ULONG                   HeapDeCommitFreeBlockThreshold;
-	ULONG                   NumberOfHeaps;
-	ULONG                   MaximumNumberOfHeaps;
-	PVOID*					ProcessHeaps;
-	PVOID                   GdiSharedHandleTable;
-	PVOID                   ProcessStarterHelper;
-	PVOID                   GdiDCAttributeList;
-	PVOID                   LoaderLock;
-	ULONG                   OSMajorVersion;
-	ULONG                   OSMinorVersion;
-	ULONG                   OSBuildNumber;
-	ULONG                   OSPlatformId;
-	ULONG                   ImageSubSystem;
-	ULONG                   ImageSubSystemMajorVersion;
-	ULONG                   ImageSubSystemMinorVersion;
-	ULONG                   GdiHandleBuffer[0x22];
-	ULONG                   PostProcessInitRoutine;
-	ULONG                   TlsExpansionBitmap;
-	BYTE                    TlsExpansionBitmapBits[0x80];
-	ULONG                   SessionId;
-} PEB, * PPEB;
-
-
-NTSYSAPI
-NTSTATUS
-NTAPI ZwQuerySystemInformation(
-	IN ULONG SystemInformationClass,
-	OUT PVOID SystemInformation,
-	IN ULONG SystemInformationLength,
-	OUT PULONG ReturnLength OPTIONAL
-);
-
-NTSTATUS DriverUnload(PDRIVER_OBJECT pDriverObject);
-NTSTATUS MajorHandle(PDEVICE_OBJECT pDriverObject, PIRP pIrp);
-NTSTATUS DriverControl(PDEVICE_OBJECT pDriverObject, PIRP pIrp);
-NTSTATUS DriverRead(PDEVICE_OBJECT pDriverObject, PIRP pIrp);
-NTSTATUS DriverWrite(PDEVICE_OBJECT pDriverObject, PIRP pIrp);
-NTSTATUS KillProcess(ULONG pid);
-NTSTATUS EnumerateModules();
-NTSTATUS EnumerateModulesEx();
+#include "test.h"
 
 NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegPath)
 {
@@ -225,7 +89,7 @@ NTSTATUS DriverControl(PDEVICE_OBJECT pDriverObject, PIRP pIrp)
 	case ENUMERATE_MODULES:
 		DbgPrint("[DriverTest] DriverControl ENUMERATE_MODULES");
 
-		EnumerateModulesEx();
+		EnumerateModules();
 
 		PVOID pBuff = pIrp->AssociatedIrp.SystemBuffer;
 		memset(pBuff, status, 10);
@@ -327,7 +191,8 @@ NTSTATUS EnumerateModules()
 		return status;
 	}
 	// TODO: Existing problem
-	PPEB_LDR_DATA pLdr = pPeb->LoaderData;
+
+	PPEB_LDR_DATA pLdr = pPeb->Ldr;
 	if (!pLdr)
 	{
 		KdPrint(("[DriverTest] PPEB_LDR_DATA is null..."));
@@ -360,15 +225,18 @@ NTSTATUS EnumerateModulesEx()
 	status = ZwQuerySystemInformation(SystemModuleInformation, NULL, NULL, &length);
 	if (status == STATUS_INFO_LENGTH_MISMATCH)
 	{
+
 		PVOID p = ExAllocatePool2(POOL_FLAG_NON_PAGED, length, 'ISQZ');
 		if (!p) {
-			KdPrint(("[DriverTest] EnumerateModulesEx ExAllocatePool Fail [size:%d], There is not enough memory in the pool to satisfy the request...\n", length));
+			KdPrint(("[DriverTest] EnumerateModulesEx ExAllocatePool Fail [size:%d], \
+				There is not enough memory in the pool to satisfy the request...\n", length));
 			return status;
 		}
 
 		status = ZwQuerySystemInformation(SystemModuleInformation, p, length, &length);
 		if (!NT_SUCCESS(status))
 		{
+			ExFreePoolWithTag(p, 'ISQZ');
 			KdPrint(("[DriverTest] EnumerateModulesEx ZwQuerySystemInformation [2] Fail %d ...\n", status));
 			return status;
 		}
@@ -380,7 +248,7 @@ NTSTATUS EnumerateModulesEx()
 				pSystemModelInformation->Modules[i].Name, pSystemModelInformation->Modules[i].ImageBaseAddress));
 		}
 
-		ExFreePool(p, 'ISQZ');
+		ExFreePoolWithTag(p, 'ISQZ');
 	}
 	else {
 		KdPrint(("[DriverTest] EnumerateModulesEx ZwQuerySystemInformation [1] Fail %d ...\n", status));
