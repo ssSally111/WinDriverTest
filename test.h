@@ -5,14 +5,63 @@
 
 #define DEVICE_NAME L"\\Device\\DriverTest"
 #define SYM_LINK_NAME L"\\??\\DriverControlsTest"
+#define DRIVER_NAME L"\\??\\C:\\Users\\ab\\Desktop\\DriverDemo.sys"
 
 #define IOCTL_TEST CTL_CODE(FILE_DEVICE_UNKNOWN, 0x800, METHOD_BUFFERED, FILE_ANY_ACCESS)
 #define ENUMERATE_MODULES CTL_CODE(FILE_DEVICE_UNKNOWN, 0x810, METHOD_BUFFERED, FILE_ANY_ACCESS)
-
-#define SystemModuleInformation 0x0B
-
+#define LOAD_SYS CTL_CODE(FILE_DEVICE_UNKNOWN, 0x820, METHOD_BUFFERED, FILE_ANY_ACCESS)
 
 typedef unsigned char       BYTE;
+typedef NTSTATUS(*FnDriverEntry)(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPathy);
+
+typedef enum _SYSTEM_INFORMATION_CLASS {
+    SystemBasicInformation,
+    SystemProcessorInformation,
+    SystemPerformanceInformation,
+    SystemTimeOfDayInformation,
+    SystemPathInformation,
+    SystemProcessInformation,
+    SystemCallCountInformation,
+    SystemDeviceInformation,
+    SystemProcessorPerformanceInformation,
+    SystemFlagsInformation,
+    SystemCallTimeInformation,
+    SystemModuleInformation,
+    SystemLocksInformation,
+    SystemStackTraceInformation,
+    SystemPagedPoolInformation,
+    SystemNonPagedPoolInformation,
+    SystemHandleInformation,
+    SystemObjectInformation,
+    SystemPageFileInformation,
+    SystemVdmInstemulInformation,
+    SystemVdmBopInformation,
+    SystemFileCacheInformation,
+    SystemPoolTagInformation,
+    SystemInterruptInformation,
+    SystemDpcBehaviorInformation,
+    SystemFullMemoryInformation,
+    SystemLoadGdiDriverInformation,
+    SystemUnloadGdiDriverInformation,
+    SystemTimeAdjustmentInformation,
+    SystemSummaryMemoryInformation,
+    SystemNextEventIdInformation,
+    SystemEventIdsInformation,
+    SystemCrashDumpInformation,
+    SystemExceptionInformation,
+    SystemCrashDumpStateInformation,
+    SystemKernelDebuggerInformation,
+    SystemContextSwitchInformation,
+    SystemRegistryQuotaInformation,
+    SystemExtendServiceTableInformation,
+    SystemPrioritySeperation,
+    SystemPlugPlayBusInformation,
+    SystemDockInformation,
+    SystemPowerInformationEx,
+    SystemProcessorSpeedInformation,
+    SystemCurrentTimeZoneInformation,
+    SystemLookasideInformation
+} SYSTEM_INFORMATION_CLASS, * PSYSTEM_INFORMATION_CLASS;
 
 
 // system module
@@ -91,14 +140,31 @@ typedef struct _PEB {
     PVOID _EndOfStructure;
 } PEB, * PPEB;
 
+// LOAD DRIVER INFORMATION
+typedef struct _SYSTEM_LOAD_GDI_DRIVER_INFORMATION {
+    UNICODE_STRING SysName;
+    ULONG               DriverStart;
+    PVOID               DriverInfo;
+    PVOID               DriverEntry;
+    PVOID               ExportDirectory;
+    ULONG               SizeOfImage;
+} SYSTEM_LOAD_GDI_DRIVER_INFORMATION, * PSYSTEM_LOAD_GDI_DRIVER_INFORMATION;
 
 NTSYSAPI
 NTSTATUS
 NTAPI ZwQuerySystemInformation(
-	IN ULONG SystemInformationClass,
+	IN SYSTEM_INFORMATION_CLASS SystemInformationClass,
 	IN OUT PVOID SystemInformation,
 	IN ULONG SystemInformationLength,
 	OUT OPTIONAL PULONG ReturnLength
+);
+
+NTSYSAPI
+NTSTATUS
+NTAPI ZwSetSystemInformation(
+    IN SYSTEM_INFORMATION_CLASS SystemInformationClass,
+    IN PVOID                SystemInformation,
+    IN ULONG                SystemInformationLength
 );
 
 
@@ -110,3 +176,5 @@ NTSTATUS DriverWrite(PDEVICE_OBJECT pDriverObject, PIRP pIrp);
 NTSTATUS KillProcess(ULONG pid);
 NTSTATUS EnumerateModules();
 NTSTATUS EnumerateModulesEx();
+VOID Initiatory(PDRIVER_OBJECT pDriverObject);
+NTSTATUS Load();

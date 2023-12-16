@@ -12,6 +12,7 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegPath)
 	pDriverObject->DriverUnload = DriverUnload;
 
 	NTSTATUS status = STATUS_SUCCESS;
+
 	PDEVICE_OBJECT pDevice;
 	UNICODE_STRING SymLinkName;
 	UNICODE_STRING DeviceName;
@@ -34,6 +35,8 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegPath)
 	}
 
 	pDevice->Flags |= DO_BUFFERED_IO;
+
+	Initiatory(pDriverObject);
 
 	return status;
 }
@@ -83,19 +86,24 @@ NTSTATUS DriverControl(PDEVICE_OBJECT pDriverObject, PIRP pIrp)
 		NTSTATUS status = KillProcess(pid);
 		memset(pBuff, status, 8);
 		info = 8;
-
 		break;
 	}
 	case ENUMERATE_MODULES:
+	{
 		DbgPrint("[DriverTest] DriverControl ENUMERATE_MODULES");
-
 		EnumerateModules();
-
-		PVOID pBuff = pIrp->AssociatedIrp.SystemBuffer;
-		memset(pBuff, status, 10);
-		info = 10;
-
+		memset(pIrp->AssociatedIrp.SystemBuffer, status, 8);
+		info = 8;
 		break;
+	}
+	case LOAD_SYS:
+	{
+		DbgPrint("[DriverTest] DriverControl LOAD_SYS");
+		status = Load();
+		memset(pIrp->AssociatedIrp.SystemBuffer, status, 8);
+		info = 8;
+		break;
+	}
 	default:
 		break;
 	}
@@ -105,7 +113,7 @@ NTSTATUS DriverControl(PDEVICE_OBJECT pDriverObject, PIRP pIrp)
 	IoCompleteRequest(pIrp, IO_NO_INCREMENT);
 
 	DbgPrint("[DriverTest] DriverControl SUCCESS");
-	return status;
+	return STATUS_SUCCESS;
 }
 
 NTSTATUS DriverRead(PDEVICE_OBJECT pDriverObject, PIRP pIrp)
@@ -254,5 +262,69 @@ NTSTATUS EnumerateModulesEx()
 		KdPrint(("[DriverTest] EnumerateModulesEx ZwQuerySystemInformation [1] Fail %d ...\n", status));
 	}
 
+	return status;
+}
+
+VOID InitiatoryProc(PVOID pDriver)
+{
+	LARGE_INTEGER SpTime;
+	SpTime.QuadPart = -100 * 1000 * 1000 * 3;
+	KeDelayExecutionThread(KernelMode, 0, &SpTime);
+
+	PDRIVER_OBJECT pDriverObject = (PDRIVER_OBJECT)pDriver;
+	PLIST_ENTRY pModuleList = pDriverObject->DriverSection;
+
+	pModuleList->Flink->Blink = pModuleList->Blink;
+	pModuleList->Blink->Flink = pModuleList->Flink;
+
+	pDriverObject->DriverSize = 0;
+	pDriverObject->DriverSection = NULL;
+	pDriverObject->DriverExtension = NULL;
+	pDriverObject->DriverStart = NULL;
+	pDriverObject->DriverInit = NULL;
+	pDriverObject->FastIoDispatch = NULL;
+	pDriverObject->DriverStartIo = NULL;
+}
+
+// 从链中去除当前驱动
+VOID Initiatory(PDRIVER_OBJECT pDriverObject)
+{
+	HANDLE hThread;
+	PsCreateSystemThread(&hThread, 0, NULL, NULL, NULL, InitiatoryProc, (PVOID)pDriverObject);
+	ZwClose(hThread);
+}
+
+// 另类加载驱动
+NTSTATUS Load()
+{
+	NTSTATUS status = STATUS_SUCCESS;
+	// 0x26也可以加载
+	SYSTEM_LOAD_GDI_DRIVER_INFORMATION DriverInfo;
+	RtlInitUnicodeString(&(DriverInfo.SysName), DRIVER_NAME);
+	status = ZwSetSystemInformation(0x36, &DriverInfo, sizeof(SYSTEM_LOAD_GDI_DRIVER_INFORMATION));
+	if (!NT_SUCCESS(status))
+	{
+		KdPrint(("[DriverTest] Load ZwSetSystemInformation Fail %d ...\n", status));
+		return status;
+	}
+
+	KdPrint(("DriverEntry:%p", DriverInfo.DriverEntry));
+
+
+	DRIVER_OBJECT      DriverObject;
+	UNICODE_STRING     RegistryPath;
+	status = ((FnDriverEntry)(DriverInfo.DriverEntry))(&DriverObject, &RegistryPath);
+	if (!NT_SUCCESS(status))
+	{
+		KdPrint(("[DriverTest] Load Call:FnDriverEntry Fail %d ...\n", status));
+		NTSTATUS status2 = ZwSetSystemInformation(0x1b, DriverInfo.DriverInfo, 0x4);
+		if (!NT_SUCCESS(status2))
+		{
+			KdPrint(("[DriverTest] Load UnloadDriver Fail %d ...\n", status2));
+		}
+		return status;
+	}
+
+	KdPrint(("[DriverTest] Load...\n"));
 	return status;
 }
